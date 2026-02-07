@@ -1,0 +1,23 @@
+# Normalize text files consistently across platforms
+* text=auto eol=lf
+
+# Windows scripts should keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Common binary formats
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.tif binary
+*.tiff binary
+*.nc binary
+*.gpkg binary
+*.shp binary
+*.dbf binary
+*.shx binary
+*.zip binary
+*.7z binary
+*.pdf binary
