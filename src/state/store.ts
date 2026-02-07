@@ -62,7 +62,7 @@ const sortByCostAt = (costs: Record<string, CostEvent>) =>
     .sort((a, b) => Date.parse(b.cost_at) - Date.parse(a.cost_at))
     .map((cost) => cost.cost_id);
 
-export const useAppStore = create<StoreState>((set, get) => ({
+export const useAppStore = create<StoreState>((set) => ({
   role: "viewer",
   animals: {},
   events: {},

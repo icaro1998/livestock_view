@@ -1,11 +1,11 @@
 import { MockDataAdapter, createMockState } from "./MockDataAdapter";
 import { MockRealtimeAdapter } from "./MockRealtimeAdapter";
 import { MockRealtimeBus } from "./bus";
-import type { Role } from "../../contract/types";
+import type { RealtimeTopic, Role } from "../../contract/types";
 
 export const createMockAdapters = ({ getRole }: { getRole: () => Role }) => {
   const bus = new MockRealtimeBus();
-  const subscription = { topics: new Set() };
+  const subscription = { topics: new Set<RealtimeTopic>() };
   const state = createMockState();
 
   return {

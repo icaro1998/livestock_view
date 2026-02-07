@@ -1,7 +1,15 @@
 import { contract } from "./contract.generated";
-import type { Role } from "./types";
+import type { Endpoint, Role } from "./types";
 
-export const roleAllows = (role: Role, required: Role) => {
+type RequiredRole = NonNullable<Endpoint["required_role"]>;
+
+const normalizeRequiredRole = (required: RequiredRole): Role => {
+  if (required === "admin (unless bootstrap allowed)") return "admin";
+  return required;
+};
+
+export const roleAllows = (role: Role, required: RequiredRole) => {
   const hierarchy = contract.roles_acl.hierarchy;
-  return hierarchy[role] >= hierarchy[required];
+  const normalized = normalizeRequiredRole(required);
+  return hierarchy[role] >= hierarchy[normalized];
 };

@@ -93,11 +93,11 @@ export const createMockState = (): MockState => {
   const exampleAnimal = contract.examples.animal_create?.response as Animal | undefined;
   if (exampleAnimal?.uid) {
     state.animals.set(exampleAnimal.uid, {
+      ...exampleAnimal,
       alert: false,
       version: 1,
       created_at: nowIso(),
-      updated_at: nowIso(),
-      ...exampleAnimal
+      updated_at: nowIso()
     });
   }
 
@@ -121,8 +121,8 @@ export const createMockState = (): MockState => {
     | undefined;
   if (exampleEvent?.event_id) {
     const event = {
-      created_at: nowIso(),
-      ...exampleEvent
+      ...exampleEvent,
+      created_at: nowIso()
     } as AnimalEventWithSubtypes;
     state.events.set(event.event_id, event);
     state.eventOrder.push(event.event_id);
@@ -131,9 +131,9 @@ export const createMockState = (): MockState => {
   const exampleCost = contract.examples.cost_create?.response as CostEvent | undefined;
   if (exampleCost?.cost_id) {
     const cost = {
+      ...exampleCost,
       created_at: nowIso(),
-      currency: exampleCost.currency ?? "BOB",
-      ...exampleCost
+      currency: exampleCost.currency ?? "BOB"
     } as CostEvent;
     state.costs.set(cost.cost_id, cost);
     state.costOrder.push(cost.cost_id);
@@ -328,12 +328,12 @@ export class MockDataAdapter implements IDataAdapter {
     const existing = this.state.animals.get(input.uid);
     if (existing) return existing;
     const animal: Animal = {
-      uid: input.uid,
+      ...input,
       alert: input.alert ?? false,
       version: 1,
       created_at: now,
       updated_at: now,
-      ...input
+      uid: input.uid
     };
     this.state.animals.set(animal.uid, animal);
 

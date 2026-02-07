@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAdapters } from "../../adapters/AdapterContext";
 import { useAppStore } from "../../state/store";
@@ -19,11 +19,14 @@ export const AnimalsPage = () => {
   const [ifMatchVersion, setIfMatchVersion] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { isLoading } = useQuery({
+  const animalsQuery = useQuery({
     queryKey: ["animals"],
-    queryFn: async () => dataAdapter.listAnimals({ limit: 50 }),
-    onSuccess: (result) => actions.upsertAnimals(result.data)
+    queryFn: async () => dataAdapter.listAnimals({ limit: 50 })
   });
+  const { isLoading } = animalsQuery;
+  useEffect(() => {
+    if (animalsQuery.data) actions.upsertAnimals(animalsQuery.data.data);
+  }, [animalsQuery.data, actions]);
 
   const createMutation = useMutation({
     mutationFn: async (payload: AnimalCreate) => dataAdapter.createAnimal(payload),

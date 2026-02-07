@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAdapters } from "../../adapters/AdapterContext";
 import { useAppStore } from "../../state/store";
@@ -22,11 +22,13 @@ export const EventsPage = () => {
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useQuery({
+  const eventsQuery = useQuery({
     queryKey: ["events"],
-    queryFn: async () => dataAdapter.listEvents({ limit: 50 }),
-    onSuccess: (result) => actions.upsertEvents(result.data)
+    queryFn: async () => dataAdapter.listEvents({ limit: 50 })
   });
+  useEffect(() => {
+    if (eventsQuery.data) actions.upsertEvents(eventsQuery.data.data);
+  }, [eventsQuery.data, actions]);
 
   const createMutation = useMutation({
     mutationFn: async (payload: EventCreate) =>

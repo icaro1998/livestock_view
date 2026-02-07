@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAdapters } from "../../adapters/AdapterContext";
 import { useAppStore } from "../../state/store";
@@ -57,11 +57,13 @@ const DimensionSection = ({
 }) => {
   const allowedFields = dimensionFieldSupportByTable[section.key];
 
-  useQuery({
+  const dimensionQuery = useQuery({
     queryKey: ["dimensions", section.key],
-    queryFn: section.list,
-    onSuccess: (result) => onUpsert(result)
+    queryFn: section.list
   });
+  useEffect(() => {
+    if (dimensionQuery.data) onUpsert(dimensionQuery.data);
+  }, [dimensionQuery.data, onUpsert]);
 
   const mutation = useMutation({
     mutationFn: async () => {

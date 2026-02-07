@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAdapters } from "../../adapters/AdapterContext";
 import { useAppStore } from "../../state/store";
@@ -22,11 +22,13 @@ export const CostsPage = () => {
   const [payloadText, setPayloadText] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useQuery({
+  const costsQuery = useQuery({
     queryKey: ["costs"],
-    queryFn: async () => dataAdapter.listCosts({ limit: 50 }),
-    onSuccess: (result) => actions.upsertCosts(result.data)
+    queryFn: async () => dataAdapter.listCosts({ limit: 50 })
   });
+  useEffect(() => {
+    if (costsQuery.data) actions.upsertCosts(costsQuery.data.data);
+  }, [costsQuery.data, actions]);
 
   const createMutation = useMutation({
     mutationFn: async (payload: CostCreate) => dataAdapter.createCost(payload),
@@ -110,7 +112,7 @@ export const CostsPage = () => {
               onChange={(event) =>
                 setCostInput({
                   ...costInput,
-                  amount: event.target.value ? Number(event.target.value) : undefined
+                  amount: event.target.value ? Number(event.target.value) : 0
                 })
               }
             />

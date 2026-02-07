@@ -1,0 +1,32 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.python-version
+.venv/
+venv/
+
+# Node/Vite
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime/log artifacts
+logs/
+*.log
+
+# GIS/generated datasets (large, reproducible)
+output/
+Flood data/
+qgis/

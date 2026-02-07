@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAdapters } from "../../adapters/AdapterContext";
 import { useAppStore } from "../../state/store";
@@ -11,18 +11,22 @@ export const AnalyticsPage = () => {
   const summary = storeSnapshot.analyticsSummary;
   const [uid, setUid] = useState("");
 
-  useQuery({
+  const summaryQuery = useQuery({
     queryKey: ["analytics", "summary"],
-    queryFn: async () => dataAdapter.getAnalyticsSummary(),
-    onSuccess: (result) => actions.setAnalyticsSummary(result)
+    queryFn: async () => dataAdapter.getAnalyticsSummary()
   });
+  useEffect(() => {
+    if (summaryQuery.data) actions.setAnalyticsSummary(summaryQuery.data);
+  }, [summaryQuery.data, actions]);
 
   const metricsQuery = useQuery({
     queryKey: ["analytics", "metrics", uid],
     queryFn: async () => dataAdapter.getAnimalMetrics(uid),
-    enabled: Boolean(uid),
-    onSuccess: (result) => actions.setAnimalMetrics(uid, result)
+    enabled: Boolean(uid)
   });
+  useEffect(() => {
+    if (uid && metricsQuery.data) actions.setAnimalMetrics(uid, metricsQuery.data);
+  }, [uid, metricsQuery.data, actions]);
 
   const derived = uid ? selectDerivedMetrics(storeSnapshot, uid) : null;
 
