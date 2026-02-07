@@ -1,7 +1,7 @@
 {
   "meta": {
     "generated_at": "2026-02-04",
-    "repo_path": "/mnt/c/Users/orlan/OneDrive/Documentos/GitHub/livestock",
+    "repo_path": "/mnt/c/Users/orlan/Documentos/GitHub/livestock",
     "sources": {
       "prisma_schema": "packages/db/prisma/schema.prisma",
       "routes_glob": "apps/api/src/routes/**",

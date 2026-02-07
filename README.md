@@ -50,3 +50,20 @@ If the hash mismatches, update `docs/CONTRACT_PACK.json` and regenerate types.
 - OpenAPI docs endpoints are registered without response schemas.
 
 The UI avoids assuming ideal behavior for these cases.
+
+## Dataset Organization (GIS)
+
+- Canonical dataset catalog: `docs/DATASET_CATALOG.md`
+- Machine inventory: `output/_index/DATASET_INDEX.csv`
+- Quick explorer shortcuts: `output/_index/open_datasets.ps1`
+- Strong-arm map: `output/_index/STRONG_ARMS.md`
+- Branch indexes:
+  - `output/strong_arms/hydrology`
+  - `output/strong_arms/topography`
+  - `output/strong_arms/world_imagery`
+
+Rebuild index after running new data pipelines:
+
+```bash
+python scripts/rebuild_dataset_index.py
+```
