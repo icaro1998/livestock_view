@@ -67,3 +67,33 @@ Rebuild index after running new data pipelines:
 ```bash
 python scripts/rebuild_dataset_index.py
 ```
+
+Validate generated rasters/NetCDF (recommended after each run):
+
+```bash
+python scripts/validate_rasters.py --root output
+```
+
+Yearly snapshot workflow now runs validation automatically at the end. Disable it only if needed:
+
+```bash
+python scripts/run_yearly_snapshots.py --no-validate-outputs
+```
+
+PowerShell one-shot workflow (rebuild index + validate + log):
+
+```powershell
+.\scripts\rebuild_and_validate.ps1
+```
+
+PowerShell end-to-end workflow (snapshots + rebuild + validate):
+
+```powershell
+.\run_yearly_snapshots.ps1 --from 01/2025 --to 12/2025
+```
+
+For large ranges, split execution into chunks to reduce freeze risk and improve progress visibility:
+
+```powershell
+.\run_yearly_snapshots.ps1 --from 01/2020 --to 12/2025 --chunk-months 6
+```

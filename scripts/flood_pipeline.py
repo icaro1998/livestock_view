@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import atexit
 import sys
 import math
@@ -51,7 +51,7 @@ DEFAULT_BUFFER_KM = 20.0
 MIN_DATA_DATE = datetime(2018, 1, 1)
 MIN_DATA_DATE_STR = MIN_DATA_DATE.date().isoformat()
 S1_START_DEFAULT = MIN_DATA_DATE_STR
-S1_END_DEFAULT = datetime.utcnow().date().isoformat()
+S1_END_DEFAULT = datetime.now(timezone.utc).date().isoformat()
 M_PER_DEGREE = 111320.0
 PROGRESS = True
 PROGRESS_INTERVAL = 1.0
@@ -59,6 +59,8 @@ GEOTIFF_ONLY = False
 BACKUP_XARRAY = False
 BACKUP_DIR: Optional[Path] = None
 LOG_PATH: Optional[Path] = None
+ORIGINAL_STDOUT = sys.stdout
+ORIGINAL_STDERR = sys.stderr
 
 
 class _Tee:
@@ -526,6 +528,9 @@ def save_netcdf_backup(ds: xr.Dataset, filename: str) -> None:
 def setup_logging(out_dir: Path, log_file: str, log_enabled: bool, append: bool) -> Optional[Path]:
     if not log_enabled and not log_file:
         return None
+    # Avoid tee-over-tee wrapping when setup is called more than once in the same process.
+    if isinstance(sys.stdout, _Tee) and isinstance(sys.stderr, _Tee):
+        return Path(log_file) if log_file else None
     out_dir.mkdir(parents=True, exist_ok=True)
     if log_file:
         log_path = Path(log_file)
@@ -536,9 +541,10 @@ def setup_logging(out_dir: Path, log_file: str, log_enabled: bool, append: bool)
     mode = "a" if append else "w"
     # Line-buffered log stream so external tailers can watch progress in real time.
     log_stream = open(log_path, mode, encoding="utf-8", buffering=1)
-    tee = _Tee(sys.stdout, file_stream=log_stream)
-    sys.stdout = tee
-    sys.stderr = tee
+    stdout_tee = _Tee(ORIGINAL_STDOUT, file_stream=log_stream)
+    stderr_tee = _Tee(ORIGINAL_STDERR, file_stream=log_stream)
+    sys.stdout = stdout_tee
+    sys.stderr = stderr_tee
 
     def _close():
         try:

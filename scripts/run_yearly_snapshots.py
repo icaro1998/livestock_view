@@ -11,6 +11,7 @@ import sys
 import argparse
 import re
 import shutil
+import atexit
 from datetime import datetime
 from pathlib import Path
 from subprocess import run
@@ -62,6 +63,59 @@ def _int_to_month(value: int) -> tuple[int, int]:
 
 def _format_month(year: int, month: int) -> str:
     return f"{year:04d}-{month:02d}"
+
+
+def _pid_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _acquire_run_lock(lock_path: Path) -> int:
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (
+        f"pid={os.getpid()}\n"
+        f"started={datetime.now().isoformat(timespec='seconds')}\n"
+        f"cwd={Path.cwd()}\n"
+    ).encode("utf-8")
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, payload)
+            return fd
+        except FileExistsError:
+            owner_pid = -1
+            try:
+                text = lock_path.read_text(encoding="utf-8")
+                match = re.search(r"pid=(\d+)", text)
+                if match:
+                    owner_pid = int(match.group(1))
+            except Exception:
+                pass
+            if owner_pid > 0 and not _pid_exists(owner_pid):
+                try:
+                    lock_path.unlink()
+                    continue
+                except Exception:
+                    pass
+            raise RuntimeError(
+                f"Another run appears active (lock: {lock_path}, pid: {owner_pid})."
+            )
+
+
+def _release_run_lock(lock_fd: int, lock_path: Path) -> None:
+    try:
+        os.close(lock_fd)
+    except Exception:
+        pass
+    try:
+        lock_path.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 
 def _coverage_lines(snapshots_dir: Path, master_path: Path) -> list[str]:
@@ -439,6 +493,26 @@ def _months_between(start: str, end: str) -> list[int]:
     return list(range(s_int, e_int))
 
 
+def _split_range_by_months(start: str, end: str, chunk_months: int) -> list[tuple[str, str]]:
+    if chunk_months <= 0:
+        return [(start, end)]
+    months = _months_between(start, end)
+    if not months:
+        return []
+    chunks: list[tuple[str, str]] = []
+    i = 0
+    while i < len(months):
+        chunk = months[i : i + chunk_months]
+        sy, sm = _int_to_month(chunk[0])
+        ey, em = _int_to_month(chunk[-1])
+        c_start = f"{sy:04d}-{sm:02d}-01"
+        end_year, end_month = _next_month(ey, em)
+        c_end = f"{end_year:04d}-{end_month:02d}-01"
+        chunks.append((c_start, c_end))
+        i += chunk_months
+    return chunks
+
+
 def _missing_months_for_range(out_dir: Path, start: str, end: str) -> list[int]:
     requested = set(_months_between(start, end))
     existing = set(_list_snapshot_months(out_dir))
@@ -515,6 +589,12 @@ def _parse_args() -> argparse.Namespace:
         default="median",
         help="Monthly aggregation method.",
     )
+    parser.add_argument(
+        "--fallback-agg",
+        choices=["none", "mean"],
+        default="mean",
+        help="Fallback aggregation if a chunk fails (recommended: mean for large runs).",
+    )
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument("--out-dir", default="", help="Base output directory (default: output/flood)")
     parser.add_argument("--project-id", default="")
@@ -547,13 +627,37 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Build timelapse GeoTIFF from existing master series and exit.",
     )
-    parser.set_defaults(verify_existing=True)
+    parser.add_argument(
+        "--chunk-months",
+        type=int,
+        default=0,
+        help="Split requested range into chunks of N months (recommended for large runs).",
+    )
+    parser.add_argument(
+        "--validate-outputs",
+        action="store_true",
+        help="Validate generated TIFF/NetCDF outputs at the end (default: on).",
+    )
+    parser.add_argument(
+        "--no-validate-outputs",
+        action="store_false",
+        dest="validate_outputs",
+        help="Skip end-of-run raster/NetCDF validation.",
+    )
+    parser.set_defaults(verify_existing=True, validate_outputs=True)
     return parser.parse_args()
 
 
 def main() -> int:
     args = _parse_args()
     base_dir = Path(args.out_dir or os.getenv("FLOOD_OUT_DIR") or "output/flood")
+    lock_path = base_dir / ".run_yearly_snapshots.lock"
+    try:
+        lock_fd = _acquire_run_lock(lock_path)
+    except RuntimeError as exc:
+        print(f"Error: {exc}")
+        return 2
+    atexit.register(_release_run_lock, lock_fd, lock_path)
     dirs = _resolve_dirs(base_dir)
     _ensure_dirs(dirs)
     _migrate_existing(base_dir, dirs)
@@ -609,8 +713,14 @@ def main() -> int:
         log_file = str(dirs["logs"] / f"run_range_{stamp}.log")
     log_path = Path(log_file)
 
-    def _run_pipeline(range_start: str, range_end: str, append_log: bool) -> int:
+    def _run_pipeline(
+        range_start: str,
+        range_end: str,
+        append_log: bool,
+        agg_override: Optional[str] = None,
+    ) -> int:
         out_dir = str(out_dir_path)
+        agg_value = agg_override or args.agg
         cmd = [
             sys.executable,
             str(pipeline),
@@ -635,7 +745,7 @@ def main() -> int:
             "--s1-series-freq",
             args.freq,
             "--s1-series-agg",
-            args.agg,
+            agg_value,
             "--out-dir",
             out_dir,
             "--log-file",
@@ -645,8 +755,30 @@ def main() -> int:
             cmd.append("--log-append")
         if project_id:
             cmd.extend(["--project-id", project_id])
-        print(f"Range: {range_start} → {range_end} (end exclusive)")
+        print(f"Range: {range_start} → {range_end} (end exclusive, agg={agg_value})")
         print(f"Running: {' '.join(cmd)}")
+        return run(cmd).returncode
+
+    def _run_output_validation() -> int:
+        validator = script_dir / "validate_rasters.py"
+        if not validator.exists():
+            print(f"Validation skipped: missing validator at {validator}")
+            return 0
+        cmd = [
+            sys.executable,
+            str(validator),
+            "--root",
+            str(base_dir),
+            "--pattern",
+            "snapshots/*.tif",
+            "--pattern",
+            "derived/*.tif",
+            "--pattern",
+            "series/*.nc",
+            "--pattern",
+            "master/*.nc",
+        ]
+        print(f"Validating outputs: {' '.join(cmd)}")
         return run(cmd).returncode
 
     def _merge_into_master(series_path: Optional[Path]) -> int:
@@ -659,24 +791,43 @@ def main() -> int:
         print(f"Merging into master: {master_path.name}")
         return _merge_series(master_path, series_path)
 
-    result_code = _run_pipeline(start, end, append_log=False)
-    if result_code != 0:
-        _append_log(
-            log_path,
-            _coverage_lines(out_dir_path, master_path)
-            + [f"Download failed with exit code {result_code}."],
-        )
-        return result_code
+    ranges = _split_range_by_months(start, end, max(0, int(args.chunk_months)))
+    if not ranges:
+        print("No months in requested range. Nothing to do.")
+        return 0
+    if len(ranges) > 1:
+        print(f"Chunk mode enabled: {len(ranges)} chunks of up to {args.chunk_months} months.")
 
-    series_path = _move_series_file(out_dir_path, series_dir, start, end)
-    merge_code = _merge_into_master(series_path)
-    if merge_code != 0:
-        _append_log(
-            log_path,
-            _coverage_lines(out_dir_path, master_path)
-            + [f"Merge failed with exit code {merge_code}."],
-        )
-        return merge_code
+    series_path: Optional[Path] = None
+    for idx, (r_start, r_end) in enumerate(ranges, start=1):
+        print(f"Chunk {idx}/{len(ranges)}: {r_start} → {r_end} (end exclusive)")
+        result_code = _run_pipeline(r_start, r_end, append_log=(idx > 1))
+        if result_code != 0 and args.agg == "median" and args.fallback_agg == "mean":
+            retry_note = (
+                f"Chunk {idx}/{len(ranges)} failed with agg=median; retrying with agg=mean."
+            )
+            print(retry_note)
+            _append_log(log_path, [retry_note])
+            result_code = _run_pipeline(r_start, r_end, append_log=True, agg_override="mean")
+        if result_code != 0:
+            _append_log(
+                log_path,
+                _coverage_lines(out_dir_path, master_path)
+                + [f"Download failed in chunk {idx}/{len(ranges)} with exit code {result_code}."],
+            )
+            return result_code
+
+        chunk_series = _move_series_file(out_dir_path, series_dir, r_start, r_end)
+        if chunk_series is not None:
+            series_path = chunk_series
+        merge_code = _merge_into_master(chunk_series)
+        if merge_code != 0:
+            _append_log(
+                log_path,
+                _coverage_lines(out_dir_path, master_path)
+                + [f"Merge failed in chunk {idx}/{len(ranges)} with exit code {merge_code}."],
+            )
+            return merge_code
 
     missing = _missing_months_for_range(out_dir_path, start, end)
     if missing:
@@ -740,6 +891,14 @@ def main() -> int:
         _append_log(log_path, [f"Timelapse GeoTIFF: {timelapse_path}"])
     else:
         _append_log(log_path, ["Timelapse GeoTIFF skipped: no source series found."])
+
+    if args.validate_outputs:
+        validate_code = _run_output_validation()
+        if validate_code != 0:
+            _append_log(log_path, [f"Output validation failed with exit code {validate_code}."])
+            return validate_code
+        _append_log(log_path, ["Output validation passed."])
+
     return 0
 
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -225,7 +225,7 @@ def _collect_stats(path: Path) -> dict[str, str]:
     latest_mtime = ""
     if files:
         latest = max(p.stat().st_mtime for p in files)
-        latest_mtime = datetime.utcfromtimestamp(latest).isoformat() + "Z"
+        latest_mtime = datetime.fromtimestamp(latest, timezone.utc).isoformat().replace("+00:00", "Z")
 
     return {
         "exists": "yes",
