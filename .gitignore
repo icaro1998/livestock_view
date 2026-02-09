@@ -2,7 +2,9 @@
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
+.vscode/*
+!.vscode/
+!.vscode/settings.json
 
 # Python
 __pycache__/
@@ -16,6 +18,11 @@ __pycache__/
 .python-version
 .venv/
 venv/
+.env
+.env.*
+!.env.example
+.ipynb_checkpoints/
+*.ipynb_checkpoints
 
 # Node/Vite
 node_modules/
@@ -30,3 +37,10 @@ logs/
 output/
 Flood data/
 qgis/
+data/exports/
+data/cache/
+*.tif
+*.tiff
+*.zarr
+*.nc
+*.mp4

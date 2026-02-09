@@ -13,8 +13,10 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import os
+import subprocess
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -23,6 +25,8 @@ import ee
 import numpy as np
 import xarray as xr
 import xee  # noqa: F401
+import rasterio
+from rasterio.windows import Window
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -156,11 +160,24 @@ def _first_existing(items: Iterable[str], valid_set: set[str]) -> list[str]:
 
 
 def _is_valid_tif(path: Path) -> bool:
-    return path.exists() and path.stat().st_size >= MIN_VALID_TIF_BYTES
+    if not path.exists():
+        return False
+    if path.stat().st_size < MIN_VALID_TIF_BYTES:
+        return False
+    try:
+        with rasterio.open(path) as ds:
+            if ds.count < 1:
+                return False
+            h = min(1, ds.height)
+            w = min(1, ds.width)
+            ds.read(1, window=Window(0, 0, w, h))
+        return True
+    except Exception:
+        return False
 
 
 def _drop_if_invalid(path: Path) -> None:
-    if path.exists() and path.stat().st_size < MIN_VALID_TIF_BYTES:
+    if path.exists() and not _is_valid_tif(path):
         path.unlink(missing_ok=True)
 
 
@@ -186,6 +203,63 @@ def _warn_temporal_coverage(requested: set[str], start: str, end: str) -> None:
                 f"   WARNING: requested window {start_d.isoformat()} -> {end_d.isoformat()} "
                 "is outside availability."
             )
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        res = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+        return str(pid) in (res.stdout or "")
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def acquire_lock(lock_path: Path) -> int:
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if lock_path.exists():
+        raw = lock_path.read_text(encoding="utf-8").strip()
+        prev_pid = 0
+        if raw:
+            try:
+                prev_pid = int(raw.split(",", 1)[0].strip())
+            except ValueError:
+                prev_pid = 0
+        if prev_pid > 0 and _pid_alive(prev_pid):
+            raise RuntimeError(
+                f"Another download_additional_datasets run is active for this out-dir "
+                f"(pid={prev_pid}). Lock file: {lock_path}"
+            )
+        # stale lock
+        lock_path.unlink(missing_ok=True)
+
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    pid = os.getpid()
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(f"{pid},{datetime.now(timezone.utc).isoformat()}\n")
+    return pid
+
+
+def release_lock(lock_path: Path, owner_pid: int) -> None:
+    if owner_pid <= 0 or not lock_path.exists():
+        return
+    try:
+        raw = lock_path.read_text(encoding="utf-8").strip()
+        pid = int(raw.split(",", 1)[0].strip()) if raw else 0
+    except Exception:
+        pid = 0
+    if pid == owner_pid:
+        lock_path.unlink(missing_ok=True)
 
 
 def export_dynamicworld(
@@ -454,68 +528,74 @@ def main() -> int:
     args = parse_args()
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = out_dir / ".download_additional_datasets.lock"
+    lock_owner_pid = acquire_lock(lock_path)
 
-    alias = {
-        "s2": "sentinel2",
-        "s2sr": "sentinel2",
-        "sentinel-2": "sentinel2",
-        "dynamic-world": "dynamicworld",
-        "s3": "s3olci",
-    }
-    requested_raw = {x.strip().lower() for x in args.datasets.split(",") if x.strip()}
-    requested = {alias.get(x, x) for x in requested_raw}
-    valid = {"dynamicworld", "s3olci", "sentinel2"}
-    unknown = requested - valid
-    if unknown:
-        raise ValueError(f"Unknown dataset(s): {sorted(unknown)}. Valid: {sorted(valid)}")
+    try:
+        alias = {
+            "s2": "sentinel2",
+            "s2sr": "sentinel2",
+            "sentinel-2": "sentinel2",
+            "dynamic-world": "dynamicworld",
+            "s3": "s3olci",
+        }
+        requested_raw = {x.strip().lower() for x in args.datasets.split(",") if x.strip()}
+        requested = {alias.get(x, x) for x in requested_raw}
+        valid = {"dynamicworld", "s3olci", "sentinel2"}
+        unknown = requested - valid
+        if unknown:
+            raise ValueError(f"Unknown dataset(s): {sorted(unknown)}. Valid: {sorted(valid)}")
 
-    ranges = month_ranges(args.start, args.end)
-    ee_init(args.project_id)
-    aoi = make_aoi(args.lat, args.lon, args.buffer_km)
+        ranges = month_ranges(args.start, args.end)
+        ee_init(args.project_id)
+        aoi = make_aoi(args.lat, args.lon, args.buffer_km)
 
-    print("Download configuration")
-    print(f" AOI center: ({args.lat}, {args.lon})")
-    print(f" Buffer km:  {args.buffer_km}")
-    print(f" Range:      {ranges[0].label} -> {ranges[-1].label} ({len(ranges)} months)")
-    print(f" Datasets:   {sorted(requested)}")
-    print(f" Out dir:    {out_dir}")
-    _warn_temporal_coverage(requested, args.start, args.end)
+        print("Download configuration")
+        print(f" AOI center: ({args.lat}, {args.lon})")
+        print(f" Buffer km:  {args.buffer_km}")
+        print(f" Range:      {ranges[0].label} -> {ranges[-1].label} ({len(ranges)} months)")
+        print(f" Datasets:   {sorted(requested)}")
+        print(f" Out dir:    {out_dir}")
+        print(f" Lock file:  {lock_path}")
+        _warn_temporal_coverage(requested, args.start, args.end)
 
-    rows: list[dict[str, object]] = []
-    if "dynamicworld" in requested:
-        export_dynamicworld(
-            aoi=aoi,
-            ranges=ranges,
-            out_dir=out_dir,
-            skip_existing=bool(args.skip_existing),
-            summary_rows=rows,
-        )
-    if "s3olci" in requested:
-        bands = [x.strip() for x in args.s3_bands.split(",") if x.strip()]
-        export_s3_olci(
-            aoi=aoi,
-            ranges=ranges,
-            bands=bands,
-            out_dir=out_dir,
-            skip_existing=bool(args.skip_existing),
-            summary_rows=rows,
-        )
-    if "sentinel2" in requested:
-        bands = [x.strip() for x in args.s2_bands.split(",") if x.strip()]
-        export_sentinel2(
-            aoi=aoi,
-            ranges=ranges,
-            bands=bands,
-            cloudy_max=float(args.s2_cloudy_max),
-            out_dir=out_dir,
-            skip_existing=bool(args.skip_existing),
-            summary_rows=rows,
-        )
+        rows: list[dict[str, object]] = []
+        if "dynamicworld" in requested:
+            export_dynamicworld(
+                aoi=aoi,
+                ranges=ranges,
+                out_dir=out_dir,
+                skip_existing=bool(args.skip_existing),
+                summary_rows=rows,
+            )
+        if "s3olci" in requested:
+            bands = [x.strip() for x in args.s3_bands.split(",") if x.strip()]
+            export_s3_olci(
+                aoi=aoi,
+                ranges=ranges,
+                bands=bands,
+                out_dir=out_dir,
+                skip_existing=bool(args.skip_existing),
+                summary_rows=rows,
+            )
+        if "sentinel2" in requested:
+            bands = [x.strip() for x in args.s2_bands.split(",") if x.strip()]
+            export_sentinel2(
+                aoi=aoi,
+                ranges=ranges,
+                bands=bands,
+                cloudy_max=float(args.s2_cloudy_max),
+                out_dir=out_dir,
+                skip_existing=bool(args.skip_existing),
+                summary_rows=rows,
+            )
 
-    summary_path = out_dir / "download_summary.csv"
-    write_summary(summary_path, rows)
-    print(f"Summary: {summary_path}")
-    return 0
+        summary_path = out_dir / "download_summary.csv"
+        write_summary(summary_path, rows)
+        print(f"Summary: {summary_path}")
+        return 0
+    finally:
+        release_lock(lock_path, lock_owner_pid)
 
 
 if __name__ == "__main__":

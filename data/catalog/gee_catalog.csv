@@ -1,0 +1,17 @@
+dataset_id,kind,source_script,pinned_on_utc,notes
+COPERNICUS/S1_GRD,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,Sentinel-1 GRD backscatter
+COPERNICUS/S2_SR_HARMONIZED,ImageCollection,scripts/download_additional_datasets.py,2026-02-08T00:00:00Z,Sentinel-2 SR harmonized
+COPERNICUS/S2_CLOUD_PROBABILITY,ImageCollection,scripts/download_s2_truecolor_monthly.py,2026-02-08T00:00:00Z,S2 cloud probability masks
+GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED,ImageCollection,scripts/download_s2_truecolor_monthly.py,2026-02-08T00:00:00Z,Cloud Score+ for Sentinel-2
+GOOGLE/DYNAMICWORLD/V1,ImageCollection,scripts/download_additional_datasets.py,2026-02-08T00:00:00Z,Dynamic World land cover probabilities
+COPERNICUS/S3/OLCI,ImageCollection,scripts/download_additional_datasets.py,2026-02-08T00:00:00Z,Sentinel-3 OLCI radiance
+GLOBAL_FLOOD_DB/MODIS_EVENTS/V1,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,MODIS flood events
+JRC/CEMS_GLOFAS/FloodHazard/v1,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,JRC flood hazard v1
+JRC/CEMS_GLOFAS/FloodHazard/v2_1,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,JRC flood hazard v2.1
+WRI/Aqueduct_Flood_Hazard_Maps/V2,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,WRI flood hazard maps
+IAHS/GFPLAIN250/v0,Image,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,GFPLAIN floodplain raster
+USGS/SRTMGL1_003,Image,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,SRTM DEM
+JRC/GSW1_4/GlobalSurfaceWater,Image,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,JRC global surface water summary
+JRC/GSW1_4/MonthlyHistory,ImageCollection,notebooks/_template_gee.ipynb,2026-02-08T00:00:00Z,JRC monthly water history
+ECMWF/ERA5/MONTHLY,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,ERA5 monthly precipitation
+ECMWF/ERA5_LAND/MONTHLY_AGGR,ImageCollection,scripts/flood_pipeline.py,2026-02-08T00:00:00Z,ERA5-Land monthly aggregates

@@ -1,0 +1,12 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+  "workbench.editorAssociations": {
+    "*.ipynb": "jupyter-notebook"
+  },
+  "jupyter.disableJupyterAutoStart": true,
+  "notebook.output.textLineLimit": 200,
+  "notebook.output.scrolling": true,
+  "notebook.consolidatedOutputButton": true,
+  "jupyter.askForKernelRestart": false
+}
