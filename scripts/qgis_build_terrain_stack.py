@@ -34,16 +34,28 @@ except Exception as exc:  # pragma: no cover
 
 BASE = Path(r"C:\Users\orlan\Documentos\GitHub\livestock_view")
 DEM_PATH = Path(
-    globals().get("DEM_PATH", str(BASE / "output" / "terrain_context" / "terrain_elevation.tif"))
+    globals().get(
+        "DEM_PATH",
+        str(BASE / "output_by_buffer" / "30km" / "flood" / "context_30km" / "terrain_elevation.tif"),
+    )
 )
 SLOPE_PATH = Path(
-    globals().get("SLOPE_PATH", str(BASE / "output" / "terrain_context" / "terrain_slope.tif"))
+    globals().get(
+        "SLOPE_PATH",
+        str(BASE / "output_by_buffer" / "30km" / "flood" / "context_30km" / "terrain_slope.tif"),
+    )
 )
 HILLSHADE_PATH = Path(
-    globals().get("HILLSHADE_PATH", str(BASE / "output" / "terrain_context" / "terrain_hillshade.tif"))
+    globals().get(
+        "HILLSHADE_PATH",
+        str(BASE / "output_by_buffer" / "30km" / "flood" / "context_30km" / "terrain_hillshade.tif"),
+    )
 )
 OUT_DIR = Path(
-    globals().get("OUT_DIR", str(BASE / "output" / "terrain_context" / "derived_qgis"))
+    globals().get(
+        "OUT_DIR",
+        str(BASE / "output_by_buffer" / "30km" / "flood" / "context_30km" / "derived_qgis"),
+    )
 )
 CONTOUR_INTERVAL = float(globals().get("CONTOUR_INTERVAL", 5.0))
 FORCE_REBUILD_CONTOURS = bool(globals().get("FORCE_REBUILD_CONTOURS", False))
@@ -376,7 +388,7 @@ def main() -> None:
         raise FileNotFoundError(
             f"DEM not found: {DEM_PATH}\n"
             "Generate first with:\n"
-            r".\.venv\Scripts\python.exe .\scripts\flood_pipeline.py --mode context --context-scale 30 --out-dir output\terrain_context --log"
+            r".\.venv\Scripts\python.exe .\scripts\flood_pipeline.py --mode context --context-scale 30 --out-dir output_by_buffer\30km\flood\context_30km --log"
         )
 
     project = QgsProject.instance()

@@ -61,106 +61,106 @@ DATASETS: list[DatasetSpec] = [
         "flood_master_10km",
         "hydrology",
         "flood_core",
-        "output/flood/master_10km",
+        "output_by_buffer/10km/flood/master_10km",
         "Sentinel-1 monthly master series",
     ),
     DatasetSpec(
         "flood_water_evolution_2025",
         "hydrology",
         "flood_core",
-        "output/flood/water_evolution_10km_2025",
+        "output_by_buffer/10km/flood/water_evolution_10km_2025",
         "Monthly water masks/overflow/frequency for 2025",
     ),
     DatasetSpec(
         "flood_context_10km",
         "topography",
         "terrain_hydrology",
-        "output/flood/context_10km",
+        "output_by_buffer/10km/flood/context_10km",
         "DEM, slope, hillshade, JRC water",
     ),
     DatasetSpec(
-        "flood_hazard_rp20_100km",
+        "flood_hazard_rp20_30km",
         "hydrology",
         "hazard",
-        "output/flood/hazard_100km_rp20",
-        "JRC hazard depth RP20",
+        "output_by_buffer/30km/flood/hazard_30km_rp20",
+        "JRC hazard depth RP20 (30km)",
     ),
     DatasetSpec(
-        "flood_hazard_rp50_100km",
+        "flood_hazard_rp50_30km",
         "hydrology",
         "hazard",
-        "output/flood/hazard_100km_rp50",
-        "JRC hazard depth RP50",
+        "output_by_buffer/30km/flood/hazard_30km_rp50",
+        "JRC hazard depth RP50 (30km)",
     ),
     DatasetSpec(
-        "flood_hazard_rp100_100km",
+        "flood_hazard_rp100_30km",
         "hydrology",
         "hazard",
-        "output/flood/hazard_100km_rp100",
-        "JRC hazard depth RP100",
+        "output_by_buffer/30km/flood/hazard_30km_rp100",
+        "JRC hazard depth RP100 (30km)",
     ),
     DatasetSpec(
         "optical_aux_2025",
         "hydrology",
         "optical_aux",
-        "output/flood/additional_10km_2025",
+        "output_by_buffer/10km/flood/additional_10km_2025",
         "Dynamic World + S3 OLCI + S2 auxiliary layers",
     ),
     DatasetSpec(
         "s2_truecolor_monthly_best_2025",
         "world_imagery",
         "satellite_rgb",
-        "output/sentinel2_truecolor_best_10km_2025",
+        "output_by_buffer/10km/sentinel2_truecolor_best_10km_2025",
         "S2 SR Harmonized monthly best-scene true color",
     ),
     DatasetSpec(
         "s2_truecolor_daily_best",
         "world_imagery",
         "satellite_rgb",
-        "output/sentinel2_truecolor_daily_10km",
+        "output_by_buffer/10km/sentinel2_truecolor_daily_10km",
         "S2 SR daily true color (best scene)",
     ),
     DatasetSpec(
         "s2_truecolor_daily_s2cloudprob",
         "world_imagery",
         "satellite_rgb",
-        "output/sentinel2_truecolor_daily_10km_s2cloudprob",
+        "output_by_buffer/10km/sentinel2_truecolor_daily_10km_s2cloudprob",
         "S2 SR daily true color masked with S2 cloud probability",
     ),
     DatasetSpec(
         "s2_truecolor_daily_cloudscoreplus",
         "world_imagery",
         "satellite_rgb",
-        "output/sentinel2_truecolor_daily_10km_csp",
+        "output_by_buffer/10km/sentinel2_truecolor_daily_10km_csp",
         "S2 SR daily true color masked with Cloud Score+",
     ),
     DatasetSpec(
         "s2_truecolor_daily_mosaic_cloudscoreplus",
         "world_imagery",
         "satellite_rgb",
-        "output/sentinel2_truecolor_daily_10km_mosaic_csp",
+        "output_by_buffer/10km/sentinel2_truecolor_daily_10km_mosaic_csp",
         "S2 SR daily mosaic (+/- window) masked with Cloud Score+",
     ),
     DatasetSpec(
         "terrain_context_raw",
         "topography",
         "terrain_hydrology",
-        "output/terrain_context",
-        "Terrain context and derived contours",
+        "output_by_buffer/30km/flood/context_30km",
+        "Terrain context and derived contours (30km)",
     ),
     DatasetSpec(
         "bundle_2025_10km",
         "hydrology",
         "bundle",
-        "output/dataset_bundle_2025_10km",
+        "output_by_buffer/10km/dataset_bundle_2025_10km",
         "Curated consolidated bundle for 2025 analysis",
     ),
     DatasetSpec(
         "legacy_flood_2025",
         "hydrology",
         "legacy",
-        "output/flood_2025",
-        "Legacy 2025 outputs retained for compatibility",
+        "output_by_buffer/30km/flood_30km",
+        "Sentinel-1 monthly snapshots/series in legacy-style flat layout (30km)",
     ),
 ]
 
@@ -307,9 +307,9 @@ def write_markdown(rows: list[dict[str, str]], path: Path) -> None:
     lines.append("")
     lines.append("## Quick Rule")
     lines.append("")
-    lines.append("- For satellite RGB (photo-like): use `output/sentinel2_truecolor_*`.")
-    lines.append("- For flood analytics: use `output/flood/*` or the curated `output/dataset_bundle_2025_10km`.")
-    lines.append("- Legacy outputs are kept in place for script compatibility; do not delete without backup.")
+    lines.append("- For satellite RGB (photo-like): use `output_by_buffer/10km/sentinel2_truecolor_*` or `output_by_buffer/30km/sentinel2_truecolor_*`.")
+    lines.append("- For flood analytics: use `output_by_buffer/10km/flood/*`, `output_by_buffer/30km/flood/*`, or `output_by_buffer/30km/flood_30km/*`.")
+    lines.append("- Keep paths under `output_by_buffer/*` as the canonical separated structure.")
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
 
